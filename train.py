@@ -551,6 +551,8 @@ def get_weight_decay(progress):
 # Training loop
 # ---------------------------------------------------------------------------
 
+scaler = torch.amp.GradScaler('cuda')
+
 t_start_training = time.time()
 smooth_train_loss = 0
 total_training_time = 0
@@ -564,7 +566,7 @@ while True:
             loss = model(x, y)
         train_loss = loss.detach()
         loss = loss / grad_accum_steps
-        loss.backward()
+        scaler.scale(loss).backward()
         x, y, epoch = next(train_loader)
 
     # Progress and schedules
@@ -577,7 +579,9 @@ while True:
         if group['kind'] == 'muon':
             group["momentum"] = muon_momentum
             group["weight_decay"] = muon_weight_decay
+    scaler.unscale_(optimizer)
     optimizer.step()
+    scaler.update()
     model.zero_grad(set_to_none=True)
 
     train_loss_f = train_loss.item()
